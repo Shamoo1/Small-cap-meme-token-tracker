@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solana Meme Token Scanner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
+      50% { box-shadow: 0 0 30px rgba(34, 197, 94, 0.6); }
+    }
+    .pulse-glow {
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+    @keyframes slide-in {
+      from { transform: translateX(-100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .slide-in {
+      animation: slide-in 0.3s ease-out;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">Solana Meme Scanner</h1>
+            <p class="text-xs text-gray-500">Real-time token tracking & rugpull detection</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2">
+            <div id="connectionStatus" class="w-2 h-2 rounded-full bg-gray-400"></div>
+            <span id="connectionText" class="text-sm text-gray-600">Connecting...</span>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-gray-500">Tokens Scanned</div>
+            <div id="scannedCount" class="text-lg font-bold text-gray-900">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Filter Controls -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-gray-900">Scan Filters</h2>
+        <button id="resetFilters" class="text-sm text-gray-600 hover:text-gray-900 transition-colors">Reset</button>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Market Cap Range -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Market Cap Range</label>
+          <div class="flex gap-2 items-center">
+            <input type="number" id="minCap" value="5000" placeholder="Min" 
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            <span class="text-gray-500">-</span>
+            <input type="number" id="maxCap" value="15000" placeholder="Max"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          </div>
+        </div>
+
+        <!-- Min Volume -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Min 24h Volume</label>
+          <input type="number" id="minVolume" value="1000" placeholder="USD"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+        </div>
+
+        <!-- Min Liquidity -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Min Liquidity</label>
+          <input type="number" id="minLiquidity" value="3000" placeholder="USD"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+        </div>
+      </div>
+
+      <!-- Security Filters -->
+      <div class="mt-4 pt-4 border-t border-gray-200">
+        <h3 class="text-sm font-medium text-gray-700 mb-3">Security Requirements</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="filterLiquidityLocked" checked class="w-4 h-4 text-purple-600 rounded">
+            <span class="text-sm text-gray-700">Liquidity Locked</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="filterMintDisabled" checked class="w-4 h-4 text-purple-600 rounded">
+            <span class="text-sm text-gray-700">Mint Disabled</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="filterFreezeDisabled" checked class="w-4 h-4 text-purple-600 rounded">
+            <span class="text-sm text-gray-700">Freeze Disabled</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="filterTopHolders" checked class="w-4 h-4 text-purple-600 rounded">
+            <span class="text-sm text-gray-700">Top 10 &lt; 30%</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="mt-4 flex gap-3">
+        <button id="startScan" class="flex-1 bg-purple-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-purple-700 transition-colors shadow-sm">
+          Start Scanning
+        </button>
+        <button id="stopScan" class="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors" disabled>
+          Stop
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-600">Safe Tokens</div>
+            <div id="safeCount" class="text-2xl font-bold text-green-600">0</div>
+          </div>
+          <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-600">Moderate Risk</div>
+            <div id="moderateCount" class="text-2xl font-bold text-yellow-600">0</div>
+          </div>
+          <div class="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-600">High Risk</div>
+            <div id="riskCount" class="text-2xl font-bold text-red-600">0</div>
+          </div>
+          <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm text-gray-600">Total Alerts</div>
+            <div id="totalAlerts" class="text-2xl font-bold text-purple-600">0</div>
+          </div>
+          <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token List -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200">
+      <div class="p-6 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-bold text-gray-900">Detected Tokens</h2>
+          <div class="flex gap-2">
+            <button id="sortByTime" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Latest First
+            </button>
+            <button id="sortByRisk" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              Safest First
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tokenList" class="divide-y divide-gray-200">
+        <!-- Tokens will be inserted here -->
+        <div class="p-12 text-center text-gray-500">
+          <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          <p class="text-lg font-medium">Start scanning to detect tokens</p>
+          <p class="text-sm mt-1">Tokens matching your criteria will appear here</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
